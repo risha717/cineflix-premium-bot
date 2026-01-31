@@ -3,10 +3,10 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, 
-    CallbackQueryHandler, ContextTypes, Filters
+    Updater, CommandHandler, MessageHandler, 
+    CallbackQueryHandler, CallbackContext, Filters
 )
-from telegram.constants import ParseMode, ChatAction, ChatMemberStatus
+from telegram.constants import ParseMode, ChatAction
 from telegram.error import BadRequest, Forbidden
 
 import config
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # ==================== HELPER FUNCTIONS ====================
 
-async def is_user_member(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+async def is_user_member(user_id: int, context: CallbackContext) -> bool:
     """Check if user is member of all force sub channels"""
     for channel_id in config.FORCE_SUB_CHANNELS:
         try:
@@ -52,7 +52,7 @@ async def send_typing_action(chat_id, context):
 
 # ==================== START COMMAND ====================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: CallbackContext):
     """Handle /start command"""
     user = update.effective_user
     
@@ -93,7 +93,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== VIDEO REQUEST HANDLER ====================
 
-async def handle_video_request(update: Update, context: ContextTypes.DEFAULT_TYPE, video_id: str):
+async def handle_video_request(update: Update, context: CallbackContext, video_id: str):
     """Handle video request from mini app"""
     user = update.effective_user
     query = update.callback_query
@@ -231,7 +231,7 @@ async def handle_video_request(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ==================== SAVE VIDEOS FROM DATABASE CHANNELS ====================
 
-async def save_channel_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def save_channel_video(update: Update, context: CallbackContext):
     """Save videos from database channels"""
     message = update.channel_post
     
@@ -344,7 +344,7 @@ async def save_channel_video(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # ==================== HELP COMMAND ====================
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def help_command(update: Update, context: CallbackContext):
     """Handle /help command"""
     keyboard = [
         [InlineKeyboardButton("📱 Open Mini App", url=config.MINI_APP_URL)],
@@ -367,7 +367,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== ADMIN PANEL ====================
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_panel(update: Update, context: CallbackContext):
     """Show admin panel"""
     query = update.callback_query
     user = update.effective_user
@@ -424,7 +424,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== MANAGE VIDEOS ====================
 
-async def manage_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def manage_videos(update: Update, context: CallbackContext):
     """Manage videos interface"""
     query = update.callback_query
     await query.answer()
@@ -463,7 +463,7 @@ async def manage_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== LIST VIDEOS BY CATEGORY ====================
 
-async def list_videos_by_category(update: Update, context: ContextTypes.DEFAULT_TYPE, category=None):
+async def list_videos_by_category(update: Update, context: CallbackContext, category=None):
     """List videos by category"""
     query = update.callback_query
     await query.answer()
@@ -505,7 +505,7 @@ async def list_videos_by_category(update: Update, context: ContextTypes.DEFAULT_
 
 # ==================== BROADCAST ====================
 
-async def start_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_broadcast(update: Update, context: CallbackContext):
     """Start broadcast process"""
     query = update.callback_query
     await query.answer()
@@ -523,7 +523,7 @@ async def start_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data['awaiting'] = 'broadcast'
 
-async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_broadcast(update: Update, context: CallbackContext):
     """Handle broadcast message"""
     users = db.get_all_users()
     total = len(users)
@@ -597,7 +597,7 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== STATISTICS ====================
 
-async def show_full_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def show_full_stats(update: Update, context: CallbackContext):
     """Show detailed statistics"""
     query = update.callback_query
     await query.answer()
@@ -640,7 +640,7 @@ async def show_full_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== CALLBACK QUERY HANDLER ====================
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update: Update, context: CallbackContext):
     """Handle all button callbacks"""
     query = update.callback_query
     data = query.data
@@ -704,7 +704,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== MESSAGE HANDLER ====================
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: CallbackContext):
     """Handle text messages"""
     user_id = update.effective_user.id
     
@@ -730,25 +730,28 @@ def main():
     """Start the bot"""
     logger.info("🤖 Starting Cineflix Premium Bot...")
     
-    # Create application
-    application = Application.builder().token(config.BOT_TOKEN).build()
+    # Create updater
+    updater = Updater(token=config.BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
     
     # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    application.add_handler(MessageHandler(Filters.TEXT & ~Filters.COMMAND, handle_message))
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help_command))
+    dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(MessageHandler(Filters.TEXT & ~Filters.COMMAND, handle_message))
     
     # Channel post handler for database channels
-    application.add_handler(MessageHandler(Filters.ChatType.CHANNEL, save_channel_video))
+    dp.add_handler(MessageHandler(Filters.ChatType.CHANNEL, save_channel_video))
     
     # Start bot
+    updater.start_polling()
+    
     logger.info("✅ Bot started successfully!")
     logger.info(f"👤 Admin ID: {config.ADMIN_ID}")
     logger.info(f"💾 Database Channels: {len(config.DATABASE_CHANNELS)}")
     logger.info(f"📢 Force Join Channels: {len(config.FORCE_SUB_CHANNELS)}")
     
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    updater.idle()
 
 if __name__ == '__main__':
     main()
