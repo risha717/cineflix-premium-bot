@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberStatus
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
-    CallbackQueryHandler, ContextTypes, filters
+    CallbackQueryHandler, ContextTypes, Filters
 )
-from telegram.constants import ParseMode, ChatAction
+from telegram.constants import ParseMode, ChatAction, ChatMemberStatus
 from telegram.error import BadRequest, Forbidden
 
 import config
@@ -32,7 +32,7 @@ async def is_user_member(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bo
     for channel_id in config.FORCE_SUB_CHANNELS:
         try:
             member = await context.bot.get_chat_member(channel_id, user_id)
-            if member.status not in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
+            if member.status not in ['member', 'administrator', 'creator']:
                 return False
         except Exception as e:
             logger.error(f"Error checking membership: {e}")
@@ -737,10 +737,10 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(button_callback))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(Filters.TEXT & ~Filters.COMMAND, handle_message))
     
     # Channel post handler for database channels
-    application.add_handler(MessageHandler(filters.ChatType.CHANNEL, save_channel_video))
+    application.add_handler(MessageHandler(Filters.ChatType.CHANNEL, save_channel_video))
     
     # Start bot
     logger.info("✅ Bot started successfully!")
